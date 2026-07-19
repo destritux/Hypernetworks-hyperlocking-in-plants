@@ -2,7 +2,7 @@
 
 This repository contains the modular Python pipeline used to analyze electrical dynamics (electrome) in soy plants (Glycine max) under saline (osmotic) and cut/fire (mechanical) stress. 
 
-Our work adapts the mathematical framework of Hypernetworks and Higher-Order Phase (Hyperlocking) [1] to plant electrophysiology, demonstrating that plant modular coordination is governed by a modulated complexity hypernetwork topology.
+Our work adapts the mathematical framework of Hypernetworks and Higher-Order Phase Sincronização (Hyperlocking) [1] to plant electrophysiology, demonstrating that plant modular coordination is governed by a modulated complexity hypernetwork topology.
 
 ---
 
@@ -108,7 +108,7 @@ All data output tables will be saved under csv/ and generated plots under img/.
 ## References
 
 * **[1] Nijholt, E., Pereira, T., Wolfrum, M., et al.** (2026). *Hypernetworks induce stable hyperlocking*. Nature Communications, 17(1), 74556.
-* **[2] Debono, M., et al.** (2025). *Abiotic stress triggers electrical synchronisation of shoot and leaves in soybean plants: a clue for plant attention-like*. (Preprint).
+* **[2] Oliveira, T. F. C., Parise, A. G., Tasca, H. C., Posso, D., Reissig, G. N., & Souza, G. M.** (2025). *Abiotic stress triggers electrical synchronisation of shoot and leaves in soybean plants: a clue for plant attention-like*. Plant Signaling & Behavior, 20(1), 2577400.
 * **[3] Pincus, S.** (1995). *Approximate entropy (ApEn) as a complexity measure*. Chaos, 5(1), 110-117.
 * **[4] Kraskov, A., Stögbauer, H., & Grassberger, P.** (2004). *Estimating mutual information*. Physical Review E, 69(6), 066138.
 * **[5] Granger, C. W. J.** (1969). *Investigating causal relations by econometric models*. Econometrica, 37(3), 424-438.
