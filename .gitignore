@@ -1,0 +1,20 @@
+# Data, papers and raw inputs
+csv/
+img/
+raw/
+cut_fire/
+salt/
+paper/
+
+# Report generation files
+script/generate_docx.py
+relatorio_hiperredes_eletroma.doc
+relatorio_hiperredes_eletroma.docx
+relatorio_hiperredes_eletroma.md
+
+# Compiled Python files
+__pycache__/
+*.pyc
+
+# Local system files
+.DS_Store
