@@ -14,7 +14,7 @@ This project bridges theoretical network physics with plant electrophysiology:
 3. **Validation Proofs:**
    * **Surrogate Data Test:** Permuting (shuffling) the maestro series breaks the CMI collapse (the CMI remains high, matching unconditioned MI), confirming that the colapso is specific to the real temporal trajectory of the maestro.
    * **Label Permutation Null Model:** Conditioning the CMI on follower channels (C2 or C4) instead of the true maestro yields no information colapso, proving topological specificity.
-   * **Granger Causality (Lags 1, 2, 3):** Confirms directional flow (Maestro -> Followers) peaking at Lag 1 and decaying gradually over Lags 2 and 3 (electrophysiological memory decay).
+   * **Transfer Entropy (Lags 1, 2, 3):** Establishes the non-linear active directionality of information flow (Maestro -> Followers) across different lags, confirming that the maestro actively drives the complexity of the followers.
    * **Stuart-Landau Control Simulation:** Simulating 3 phase oscillators driven by a modulator under Wiener noise replicates this exact behavior, proving the mathematical validity of our pipeline under high noise.
 
 ---
@@ -45,8 +45,8 @@ The pipeline consists of modular, sequential Python 3 scripts:
 7. **`07_advanced_cmi_analysis.py` (Sliding Windows and Label Permutation):**
    * Estimates CMI in 15-minute sliding windows to capture rapid transitions.
    * Runs the label permutation null model, comparing CMI across all potential maestros.
-8. **`08_granger_causality.py` (Causal Directionality):**
-   * Performs plant-by-plant Granger Causality testing at Lags 1, 2, and 3 on differenced features.
+8. **`08_transfer_entropy.py` (Causal Information Flow):**
+   * Performs plant-by-plant Transfer Entropy testing at Lags 1, 2, and 3 on complexity features to establish directional routing.
 
 ---
 
@@ -70,7 +70,7 @@ Conditioning the coordination structure on the true maestro yields a massive, sp
 ### 1. Requirements
 Install the required scientific packages:
 ```bash
-pip install numpy pandas scipy scikit-learn matplotlib seaborn statsmodels
+pip install numpy pandas scipy scikit-learn matplotlib seaborn
 ```
 
 ### 2. Execution
@@ -97,8 +97,8 @@ python3 script/06_stuart_landau_sim.py
 # Step 7: 15-min Sliding window & Label permutation null model
 python3 script/07_advanced_cmi_analysis.py
 
-# Step 8: Multi-lag Granger Causality directionality
-python3 script/08_granger_causality.py
+# Step 8: Multi-lag Transfer Entropy directionality
+python3 script/08_transfer_entropy.py
 ```
 
 All data output tables will be saved under csv/ and generated plots under img/.

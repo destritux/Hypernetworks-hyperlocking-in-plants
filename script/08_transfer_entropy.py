@@ -3,7 +3,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from statsmodels.tsa.stattools import grangercausalitytests
+from sklearn.feature_selection import mutual_info_regression
+from scipy.stats import wilcoxon
 
 def clean_source_file_cf(name):
     return name.split('_canal')[0].split('_c')[0]
@@ -11,17 +12,34 @@ def clean_source_file_cf(name):
 def clean_source_file_salt(name):
     return name.split('_Ch')[0].split('_ch')[0].lower()
 
-def run_granger_test(y, x, lag=1):
-    data = np.column_stack([y, x])
-    try:
-        res = grangercausalitytests(data, maxlag=[lag], verbose=False)
-        p_val = res[lag][0]['ssr_ftest'][1]
-        return p_val
-    except Exception as e:
-        return 1.0
+def conditional_mutual_information(X, Y, Z):
+    # CMI: I(X; Y | Z)
+    # Using the symmetric k-NN estimator to mitigate bias
+    I_X_YZ = mutual_info_regression(np.column_stack([Y, Z]), X)[0]
+    I_X_Z = mutual_info_regression(Z.reshape(-1, 1), X)[0]
+    mi1 = max(0.0, I_X_YZ - I_X_Z)
+    
+    I_Y_XZ = mutual_info_regression(np.column_stack([X, Z]), Y)[0]
+    I_Y_Z = mutual_info_regression(Z.reshape(-1, 1), Y)[0]
+    mi2 = max(0.0, I_Y_XZ - I_Y_Z)
+    
+    return 0.5 * (mi1 + mi2)
+
+def calculate_transfer_entropy(source, target, lag=1):
+    # T_{S -> T} = I(T_future; S_past | T_past)
+    if len(source) <= lag:
+        return 0.0
+        
+    T_future = target[lag:]
+    T_past = target[:-lag]
+    S_past = source[:-lag]
+    
+    return conditional_mutual_information(T_future, S_past, T_past)
 
 def main():
-    print("Starting Granger Causality Directionality Analysis (Lags 1, 2, 3)...")
+    print("Starting Transfer Entropy (TE) Analysis (Lags 1, 2, 3)...")
+    np.random.seed(42)
+    
     features = ['ApEn', 'DFA', 'PSD_mean']
     records = []
     
@@ -47,7 +65,6 @@ def main():
             df_ch = df_ch.sort_values(['plant_id', 'minute']).reset_index(drop=True)
             ch_data[ch] = df_ch
             
-        # Get unique plant IDs
         plants = ch_data['C1']['plant_id'].unique()
         
         for plant in plants:
@@ -56,20 +73,16 @@ def main():
                 plant_data[ch] = ch_data[ch][ch_data[ch]['plant_id'] == plant].reset_index(drop=True)
                 
             for feat in features:
-                # Difference the series to ensure stationarity
-                diff_series = {}
-                for ch in channels:
-                    y_ch = plant_data[ch][feat].values
-                    diff_series[ch] = np.diff(y_ch)
-                    
-                # Test causality for lags 1, 2, and 3
                 for lag in [1, 2, 3]:
                     for follower in non_maestro_chs:
+                        s_m = plant_data[maestro_ch][feat].values
+                        s_f = plant_data[follower][feat].values
+                        
                         # Direction 1: Maestro -> Follower
-                        p_m_to_f = run_granger_test(diff_series[follower], diff_series[maestro_ch], lag=lag)
+                        te_m_to_f = calculate_transfer_entropy(s_m, s_f, lag=lag)
                         
                         # Direction 2: Follower -> Maestro
-                        p_f_to_m = run_granger_test(diff_series[maestro_ch], diff_series[follower], lag=lag)
+                        te_f_to_m = calculate_transfer_entropy(s_f, s_m, lag=lag)
                         
                         records.append({
                             'treatment': treatment,
@@ -77,93 +90,88 @@ def main():
                             'feature': feat,
                             'lag': lag,
                             'follower_channel': follower,
-                            'maestro_to_follower_p': p_m_to_f,
-                            'follower_to_maestro_p': p_f_to_m,
-                            'maestro_to_follower_sig': 1 if p_m_to_f < 0.05 else 0,
-                            'follower_to_maestro_sig': 1 if p_f_to_m < 0.05 else 0
+                            'te_maestro_to_follower': te_m_to_f,
+                            'te_follower_to_maestro': te_f_to_m
                         })
 
-    # Save to CSV
-    df_gc = pd.DataFrame(records)
-    df_gc.to_csv('csv/granger_causality_results.csv', index=False)
-    print("Granger Causality results saved to csv/granger_causality_results.csv")
+    df_te = pd.DataFrame(records)
+    os.makedirs('csv', exist_ok=True)
+    df_te.to_csv('csv/transfer_entropy_results.csv', index=False)
+    print("Transfer Entropy results saved to csv/transfer_entropy_results.csv")
     
-    # 4. PLOTTING GRANGER CAUSALITY RESULTS (1x3 Subplots comparing Lags)
+    # Statistical test of asymmetry: is TE(M->F) > TE(F->M)?
+    print("\n=== Transfer Entropy Directional Asymmetry Test ===")
+    for treatment in ['cut_fire', 'salt']:
+        df_treat = df_te[df_te['treatment'] == treatment]
+        for lag in [1, 2, 3]:
+            df_sub = df_treat[df_treat['lag'] == lag]
+            m_to_f = df_sub['te_maestro_to_follower'].values
+            f_to_m = df_sub['te_follower_to_maestro'].values
+            
+            # Paired Wilcoxon test on asymmetry
+            stat, p_val = wilcoxon(m_to_f, f_to_m, alternative='greater')
+            print(f"{treatment.upper()} - Lag {lag}: Mean TE(M->F) = {np.mean(m_to_f):.4f}, Mean TE(F->M) = {np.mean(f_to_m):.4f}, p-value = {p_val:.5f}")
+            
+    # PLOT TRANSFER ENTROPY RESULTS
     plot_data = []
-    for idx, row in df_gc.iterrows():
+    for _, row in df_te.iterrows():
         plot_data.append({
             'Treatment': row['treatment'].replace('_', ' ').title(),
             'Feature': row['feature'],
             'Lag': f"Lag {row['lag']}",
             'Direction': 'Maestro → Followers',
-            'Significant': row['maestro_to_follower_sig']
+            'TE (bits)': row['te_maestro_to_follower']
         })
         plot_data.append({
             'Treatment': row['treatment'].replace('_', ' ').title(),
             'Feature': row['feature'],
             'Lag': f"Lag {row['lag']}",
             'Direction': 'Followers → Maestro',
-            'Significant': row['follower_to_maestro_sig']
+            'TE (bits)': row['te_follower_to_maestro']
         })
         
     df_plot = pd.DataFrame(plot_data)
-    
-    # Calculate percentage significant per group
-    df_plot_grouped = df_plot.groupby(['Treatment', 'Feature', 'Lag', 'Direction'])['Significant'].mean().reset_index()
-    df_plot_grouped['Significant (%)'] = df_plot_grouped['Significant'] * 100
     
     fig, axes = plt.subplots(1, 3, figsize=(18, 6), sharey=True)
     sns.set_theme(style="whitegrid")
     
     for idx, lag in enumerate([1, 2, 3]):
         ax = axes[idx]
-        df_lag = df_plot_grouped[df_plot_grouped['Lag'] == f"Lag {lag}"]
+        df_lag = df_plot[df_plot['Lag'] == f"Lag {lag}"]
         
         sns.barplot(
             data=df_lag,
             x='Feature',
-            y='Significant (%)',
+            y='TE (bits)',
             hue='Direction',
             ax=ax,
             palette={'Maestro → Followers': '#d62728', 'Followers → Maestro': '#7f7f7f'},
             edgecolor='black',
-            alpha=0.85
+            alpha=0.85,
+            errorbar='se'
         )
         
-        ax.set_title(f"Granger Causality (Lag {lag})", fontsize=14, fontweight='bold')
+        ax.set_title(f"Transfer Entropy (Lag {lag})", fontsize=14, fontweight='bold')
         ax.set_xlabel("Complexity Feature", fontsize=12)
         if idx == 0:
-            ax.set_ylabel("Significant Causal Links (%)", fontsize=12)
+            ax.set_ylabel("Information Flow (bits)", fontsize=12)
         else:
             ax.set_ylabel("")
-        ax.set_ylim(0, 100)
         ax.grid(True, linestyle=':', alpha=0.6)
         
-        # Annotate bars
-        for p in ax.patches:
-            height = p.get_height()
-            if height > 0:
-                ax.annotate(f"{height:.1f}%",
-                            (p.get_x() + p.get_width() / 2., height),
-                            ha='center', va='bottom',
-                            fontsize=9, color='black',
-                            xytext=(0, 2),
-                            textcoords='offset points',
-                            fontweight='bold')
-        
-        # Only show legend on the last subplot to avoid clutter
+        # Legend configuration
         if idx == 2:
-            ax.legend(title='Causal Direction', title_fontsize='11', fontsize='10', loc='upper right')
+            ax.legend(title='Information Flow', title_fontsize='11', fontsize='10', loc='upper right')
         else:
             ax.get_legend().remove()
             
-    plt.suptitle("Granger Causality Directionality in Plant Complexity Features (Lags 1, 2, 3)", fontsize=18, fontweight='bold', y=1.02)
+    plt.suptitle("Information Flow Directionality: Transfer Entropy comparison (Lags 1, 2, 3)", fontsize=18, fontweight='bold', y=1.02)
     plt.tight_layout()
     
-    plot_path = "img/granger_causality_directionality.png"
+    plot_path = "img/transfer_entropy_directionality.png"
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
     plt.close()
-    print(f"Granger causality multi-lag plot saved to {plot_path}")
+    print(f"Transfer entropy plot saved to {plot_path}")
 
 if __name__ == '__main__':
     main()
