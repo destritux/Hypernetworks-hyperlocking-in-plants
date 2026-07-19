@@ -2,7 +2,7 @@
 
 This repository contains the modular Python pipeline used to analyze electrical dynamics (electrome) in soy plants (Glycine max) under saline (osmotic) and cut/fire (mechanical) stress. 
 
-Our work adapts the mathematical framework of Hypernetworks and Higher-Order Phase Sincronização (Hyperlocking) [1] to plant electrophysiology, demonstrating that plant modular coordination is governed by a modulated complexity hypernetwork topology.
+Our work adapts the mathematical framework of Hypernetworks and Higher-Order Phase (Hyperlocking) [1] to plant electrophysiology, demonstrating that plant modular coordination is governed by a modulated complexity hypernetwork topology.
 
 ---
 
